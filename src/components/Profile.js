@@ -32,8 +32,18 @@ const Profile = () => {
         setFormData({
           name: user.name || '',
           email: user.email || '',
-          age: user.age || '',
-          dob: user.dob ? user.dob.split('T')[0] : '',
+          age: user.age ? String(user.age) : '',
+          dob: user.dob ? (() => {
+            try {
+              if (typeof user.dob === 'string') {
+                return user.dob.split('T')[0];
+              }
+              const date = new Date(user.dob);
+              return isNaN(date.getTime()) ? '' : date.toISOString().split('T')[0];
+            } catch {
+              return '';
+            }
+          })() : '',
           contact: user.contact || '',
         });
 
@@ -49,10 +59,16 @@ const Profile = () => {
         }
       }
     } catch (error) {
-      if (error.response && error.response.data) {
+      if (error.response) {
+        if (error.response.status === 401) {
+          // Token expired or invalid - redirect to login
+          authLogout();
+          navigate('/login', { replace: true });
+          return;
+        }
         setMessage({
           type: 'danger',
-          text: error.response.data.message || 'Failed to load profile',
+          text: error.response.data?.message || 'Failed to load profile',
         });
       } else {
         setMessage({
@@ -87,11 +103,11 @@ const Profile = () => {
       newErrors.name = 'Name is required';
     }
 
-    if (
-      formData.age &&
-      (isNaN(formData.age) || formData.age < 1 || formData.age > 150)
-    ) {
-      newErrors.age = 'Age must be between 1 and 150';
+    if (formData.age && formData.age.trim() !== '') {
+      const ageNum = parseInt(formData.age, 10);
+      if (isNaN(ageNum) || ageNum < 1 || ageNum > 150) {
+        newErrors.age = 'Age must be between 1 and 150';
+      }
     }
 
     setErrors(newErrors);
@@ -109,14 +125,17 @@ const Profile = () => {
     try {
       const updateData = {
         name: formData.name.trim(),
-        age: formData.age ? parseInt(formData.age) : undefined,
-        dob: formData.dob || undefined,
-        contact: formData.contact.trim() || undefined,
+        age: formData.age && formData.age.trim() !== '' ? parseInt(formData.age, 10) : undefined,
+        dob: formData.dob && formData.dob.trim() !== '' ? formData.dob : undefined,
+        contact: formData.contact && formData.contact.trim() !== '' ? formData.contact.trim() : undefined,
       };
 
-      Object.keys(updateData).forEach(
-        (key) => updateData[key] === undefined && delete updateData[key]
-      );
+      // Remove undefined values and check for NaN
+      Object.keys(updateData).forEach((key) => {
+        if (updateData[key] === undefined || (key === 'age' && isNaN(updateData[key]))) {
+          delete updateData[key];
+        }
+      });
 
       const response = await api.put('/profile', updateData);
 
@@ -131,12 +150,28 @@ const Profile = () => {
         }, 3000);
       }
     } catch (error) {
-      if (error.response && error.response.data) {
+      if (error.response) {
+        if (error.response.status === 401) {
+          // Token expired or invalid - redirect to login
+          authLogout();
+          navigate('/login', { replace: true });
+          return;
+        }
         const errorData = error.response.data;
         setMessage({
           type: 'danger',
-          text: errorData.message || 'Failed to update profile',
+          text: errorData?.message || 'Failed to update profile',
         });
+        // Handle validation errors
+        if (error.response.status === 400 && errorData.errors && Array.isArray(errorData.errors)) {
+          const validationErrors = {};
+          errorData.errors.forEach((err) => {
+            if (err.param) {
+              validationErrors[err.param] = err.msg;
+            }
+          });
+          setErrors((prev) => ({ ...prev, ...validationErrors }));
+        }
       } else {
         setMessage({
           type: 'danger',

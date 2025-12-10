@@ -2,14 +2,16 @@
 import axios from 'axios';
 import { getAuthToken, removeAuthToken, removeUserInfo } from './auth';
 
+// Use your Render backend here
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: 'https://server-d274.onrender.com/api',   // ⭐ UPDATED
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 60000, // 60 seconds timeout (Render free tier can take time to wake up)
 });
 
-// Attach token
+// Add token automatically to requests
 api.interceptors.request.use(
   (config) => {
     const token = getAuthToken();
@@ -21,7 +23,7 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Handle 401
+// Auto logout on 401 errors
 api.interceptors.response.use(
   (response) => response,
   (error) => {
