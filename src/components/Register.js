@@ -67,135 +67,66 @@ const Register = () => {
 
     setLoading(true);
 
-    
-    let success = false;
+    try {
+      // backend route: POST /api/auth/signup
+      const response = await api.post('/auth/signup', {
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        password: formData.password,
+      });
 
-    while (retries >= 0 && !success) {
-      try {
-        const response = await api.post('/auth/register', {
-          name: formData.name.trim(),
-          email: formData.email.trim(),
-          password: formData.password,
+      if (response.data && response.data.success) {
+        setMessage({
+          type: 'success',
+          text: 'Registration successful! Redirecting to login...',
         });
 
-        // Log the response for debugging
-        console.log('Registration response:', response);
-        console.log('Response status:', response.status);
-        console.log('Response data:', response.data);
-
-        // Check if registration was successful
-        // Backend returns: { success: true, message: 'Registration successful', ... } with status 201
-        const status = response.status;
-        const isSuccess = (status === 200 || status === 201) && response.data?.success === true;
-        
-        if (isSuccess) {
-          // Registration successful
-          success = true;
-          setMessage({
-            type: 'success',
-            text: 'Registration successful! Redirecting to login...',
-          });
-
-          setTimeout(() => {
-            navigate('/login', { replace: true });
-          }, 1200);
-          break; // Exit retry loop on success
-        } else {
-          // Registration failed - show backend message or default
-          const errorMsg = response.data?.message || 'Registration failed. Please try again.';
-          setMessage({
-            type: 'danger',
-            text: errorMsg,
-          });
-          break; // Exit retry loop on non-timeout error
-        }
-      } catch (error) {
-        console.error('Registration error:', error);
-        console.error('Error response:', error.response);
-        console.error('Error data:', error.response?.data);
-        
-        if (error.response) {
-          // Server responded with error status - don't retry
-          const errorData = error.response.data;
-          const status = error.response.status;
-          
-          if (status === 409) {
-            // Duplicate email
-            setErrors((prev) => ({
-              ...prev,
-              email: 'Email already registered',
-            }));
-            setMessage({
-              type: 'danger',
-              text: 'Email already registered. Please use a different email.',
-            });
-          } else if (status === 400) {
-            // Validation errors from backend
-            if (errorData.errors && Array.isArray(errorData.errors)) {
-              // Map validation errors to form fields
-              const validationErrors = {};
-              errorData.errors.forEach((err) => {
-                if (err.param) {
-                  validationErrors[err.param] = err.msg;
-                }
-              });
-              setErrors((prev) => ({ ...prev, ...validationErrors }));
-            }
-            setMessage({
-              type: 'danger',
-              text: errorData.message || 'Please check your input and try again.',
-            });
-          } else if (errorData && errorData.message) {
-            setMessage({
-              type: 'danger',
-              text: errorData.message,
-            });
-          } else {
-            setMessage({
-              type: 'danger',
-              text: 'Registration failed. Please try again.',
-            });
-          }
-          break; // Exit retry loop on server error
-        } else if (error.request) {
-          // Request was made but no response received
-          if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
-            // Timeout error - retry if we have retries left
-            if (retries > 0) {
-              retries--;
-              setMessage({
-                type: 'warning',
-                text: `Server is waking up... Retrying (${2 - retries}/2)...`,
-              });
-              // Wait 3 seconds before retry to give server time to wake up
-              await new Promise(resolve => setTimeout(resolve, 3000));
-              continue; // Retry the request
-            } else {
-              setMessage({
-                type: 'danger',
-                text: 'Server is taking too long to respond. The server may be waking up from sleep. Please wait a moment and try again, or refresh the page.',
-              });
-              break; // Exit retry loop after all retries exhausted
-            }
-          } else {
-            setMessage({
-              type: 'danger',
-              text: 'Unable to connect to server. Please check your internet connection and try again.',
-            });
-            break; // Exit retry loop on connection error
-          }
-        } else {
-          // Error setting up the request
-          setMessage({
-            type: 'danger',
-            text: error.message || 'Registration failed. Please try again.',
-          });
-          break; // Exit retry loop on setup error
-        }
+        setTimeout(() => {
+          navigate('/login', { replace: true });
+        }, 1200);
+      } else {
+        setMessage({
+          type: 'danger',
+          text:
+            response.data?.message ||
+            'Registration failed. Please try again.',
+        });
       }
-    }
+    } catch (error) {
+      if (error.response) {
+        const { status, data } = error.response;
 
-    setLoading(false);
+        if (status === 409) {
+          // email already exists
+          setErrors((prev) => ({
+            ...prev,
+            email: 'Email already registered',
+          }));
+          setMessage({
+            type: 'danger',
+            text: data.message || 'Email already registered.',
+          });
+        } else if (status === 400) {
+          // validation errors from backend
+          setMessage({
+            type: 'danger',
+            text: data.message || 'Please check your input and try again.',
+          });
+        } else {
+          setMessage({
+            type: 'danger',
+            text: data.message || 'Registration failed. Please try again.',
+          });
+        }
+      } else {
+        setMessage({
+          type: 'danger',
+          text: 'Unable to connect to server. Please try again.',
+        });
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -248,9 +179,7 @@ const Register = () => {
                   </label>
                   <input
                     type="password"
-                    className={`form-control ${
-                      errors.password ? 'is-invalid' : ''
-                    }`}
+                    className={`form-control ${errors.password ? 'is-invalid' : ''}`}
                     id="password"
                     name="password"
                     value={formData.password}
