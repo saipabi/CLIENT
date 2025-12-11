@@ -23,7 +23,15 @@ export const getAuthToken = () => {
   // Get user info
   export const getUserInfo = () => {
     const userInfo = localStorage.getItem('user_info');
-    return userInfo ? JSON.parse(userInfo) : null;
+    if (!userInfo) return null;
+  
+    try {
+      return JSON.parse(userInfo);
+    } catch (err) {
+      // Clear corrupted entry to avoid breaking callers
+      localStorage.removeItem('user_info');
+      return null;
+    }
   };
   
   // Remove user info

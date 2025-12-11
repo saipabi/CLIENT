@@ -3,7 +3,7 @@ import axios from 'axios';
 import { getAuthToken, removeAuthToken, removeUserInfo } from './auth';
 
 const api = axios.create({
-  // Use environment variable for flexibility across Netlify/localhost.
+
   baseURL:
     process.env.REACT_APP_API_URL?.replace(/\/$/, '') ||
     'https://server-d274.onrender.com/api',
