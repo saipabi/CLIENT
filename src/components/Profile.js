@@ -1,5 +1,5 @@
 // src/components/Profile.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { logout as authLogout } from '../utils/auth';
@@ -19,11 +19,7 @@ const Profile = () => {
   const [profileLoading, setProfileLoading] = useState(true);
   const [memberSince, setMemberSince] = useState('');
 
-  useEffect(() => {
-    loadProfile();
-  }, []);
-
-  const loadProfile = async () => {
+  const loadProfile = useCallback(async () => {
     setProfileLoading(true);
     try {
       const response = await api.get('/profile');
@@ -33,17 +29,21 @@ const Profile = () => {
           name: user.name || '',
           email: user.email || '',
           age: user.age ? String(user.age) : '',
-          dob: user.dob ? (() => {
-            try {
-              if (typeof user.dob === 'string') {
-                return user.dob.split('T')[0];
-              }
-              const date = new Date(user.dob);
-              return isNaN(date.getTime()) ? '' : date.toISOString().split('T')[0];
-            } catch {
-              return '';
-            }
-          })() : '',
+          dob: user.dob
+            ? (() => {
+                try {
+                  if (typeof user.dob === 'string') {
+                    return user.dob.split('T')[0];
+                  }
+                  const date = new Date(user.dob);
+                  return isNaN(date.getTime())
+                    ? ''
+                    : date.toISOString().split('T')[0];
+                } catch {
+                  return '';
+                }
+              })()
+            : '',
           contact: user.contact || '',
         });
 
@@ -79,7 +79,11 @@ const Profile = () => {
     } finally {
       setProfileLoading(false);
     }
-  };
+  }, [navigate]);
+
+  useEffect(() => {
+    loadProfile();
+  }, [loadProfile]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -125,14 +129,24 @@ const Profile = () => {
     try {
       const updateData = {
         name: formData.name.trim(),
-        age: formData.age && formData.age.trim() !== '' ? parseInt(formData.age, 10) : undefined,
-        dob: formData.dob && formData.dob.trim() !== '' ? formData.dob : undefined,
-        contact: formData.contact && formData.contact.trim() !== '' ? formData.contact.trim() : undefined,
+        age:
+          formData.age && formData.age.trim() !== ''
+            ? parseInt(formData.age, 10)
+            : undefined,
+        dob:
+          formData.dob && formData.dob.trim() !== '' ? formData.dob : undefined,
+        contact:
+          formData.contact && formData.contact.trim() !== ''
+            ? formData.contact.trim()
+            : undefined,
       };
 
       // Remove undefined values and check for NaN
       Object.keys(updateData).forEach((key) => {
-        if (updateData[key] === undefined || (key === 'age' && isNaN(updateData[key]))) {
+        if (
+          updateData[key] === undefined ||
+          (key === 'age' && isNaN(updateData[key]))
+        ) {
           delete updateData[key];
         }
       });
@@ -144,7 +158,8 @@ const Profile = () => {
           type: 'success',
           text: 'Profile updated successfully!',
         });
-        loadProfile();
+        // refresh profile after successful update
+        await loadProfile();
         setTimeout(() => {
           setMessage({ type: '', text: '' });
         }, 3000);
@@ -163,7 +178,11 @@ const Profile = () => {
           text: errorData?.message || 'Failed to update profile',
         });
         // Handle validation errors
-        if (error.response.status === 400 && errorData.errors && Array.isArray(errorData.errors)) {
+        if (
+          error.response.status === 400 &&
+          errorData.errors &&
+          Array.isArray(errorData.errors)
+        ) {
           const validationErrors = {};
           errorData.errors.forEach((err) => {
             if (err.param) {
@@ -246,9 +265,7 @@ const Profile = () => {
                 {message.text && (
                   <div
                     className={`alert ${
-                      message.type === 'success'
-                        ? 'alert-success'
-                        : 'alert-danger'
+                      message.type === 'success' ? 'alert-success' : 'alert-danger'
                     }`}
                     role="alert"
                   >
@@ -264,18 +281,14 @@ const Profile = () => {
                       </label>
                       <input
                         type="text"
-                        className={`form-control ${
-                          errors.name ? 'is-invalid' : ''
-                        }`}
+                        className={`form-control ${errors.name ? 'is-invalid' : ''}`}
                         id="name"
                         name="name"
                         value={formData.name}
                         onChange={handleChange}
                         required
                       />
-                      {errors.name && (
-                        <div className="invalid-feedback">{errors.name}</div>
-                      )}
+                      {errors.name && <div className="invalid-feedback">{errors.name}</div>}
                     </div>
 
                     <div className="col-md-6 mb-3">
@@ -290,9 +303,7 @@ const Profile = () => {
                         value={formData.email}
                         disabled
                       />
-                      <small className="text-muted">
-                        Email cannot be changed
-                      </small>
+                      <small className="text-muted">Email cannot be changed</small>
                     </div>
                   </div>
 
@@ -303,9 +314,7 @@ const Profile = () => {
                       </label>
                       <input
                         type="number"
-                        className={`form-control ${
-                          errors.age ? 'is-invalid' : ''
-                        }`}
+                        className={`form-control ${errors.age ? 'is-invalid' : ''}`}
                         id="age"
                         name="age"
                         value={formData.age}
@@ -314,12 +323,8 @@ const Profile = () => {
                         max="150"
                         placeholder="Enter your age"
                       />
-                      {errors.age && (
-                        <div className="invalid-feedback">{errors.age}</div>
-                      )}
-                      <small className="text-muted">
-                        Age must be between 1 and 150 (optional)
-                      </small>
+                      {errors.age && <div className="invalid-feedback">{errors.age}</div>}
+                      <small className="text-muted">Age must be between 1 and 150 (optional)</small>
                     </div>
 
                     <div className="col-md-6 mb-3">
@@ -334,9 +339,7 @@ const Profile = () => {
                         value={formData.dob}
                         onChange={handleChange}
                       />
-                      <small className="text-muted">
-                        Select your date of birth (optional)
-                      </small>
+                      <small className="text-muted">Select your date of birth (optional)</small>
                     </div>
                   </div>
 
@@ -353,17 +356,11 @@ const Profile = () => {
                       onChange={handleChange}
                       placeholder="e.g., +919876543210"
                     />
-                    <small className="text-muted">
-                      Enter your phone number (optional)
-                    </small>
+                    <small className="text-muted">Enter your phone number (optional)</small>
                   </div>
 
                   <div className="d-grid gap-2">
-                    <button
-                      type="submit"
-                      className="btn btn-primary btn-lg"
-                      disabled={loading}
-                    >
+                    <button type="submit" className="btn btn-primary btn-lg" disabled={loading}>
                       {loading ? 'Updating...' : 'Update Profile'}
                     </button>
                   </div>
